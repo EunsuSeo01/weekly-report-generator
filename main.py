@@ -9,7 +9,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
-# --- ⚙️ 설정: 이 부분을 자신의 정보로 수정하세요 ⚙️ ---
 
 # 1. Slack 설정
 SLACK_BOT_TOKEN = "[YOUR_SLACK_BOT_TOKEN]"
@@ -53,7 +52,7 @@ def load_all_documents():
     # 2. Notion 로더 (이전과 동일)
     try:
         if NOTION_INTEGRATION_TOKEN.startswith("[YOUR_"):
-             print("⚠️ Notion 토큰이 설정되지 않았습니다. Notion 로딩을 건너뜁니다.")
+            print("⚠️ Notion 토큰이 설정되지 않았습니다. Notion 로딩을 건너뜁니다.")
         else:
             print("🔄 Notion에서 문서를 가져옵니다...")
             loader = NotionDirectoryLoader(integration_token=NOTION_INTEGRATION_TOKEN, page_ids=NOTION_PAGE_IDS)
