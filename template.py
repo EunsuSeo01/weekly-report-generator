@@ -12,7 +12,7 @@ from langchain_openai import OpenAIEmbeddings
 import os
 import build_vector_db
 from build_vector_db import build_vector_db
-from datetime import date
+from datetime import date, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -25,8 +25,8 @@ if not openai_api_key:
 os.environ["OPENAI_API_KEY"] = openai_api_key
 
 app = FastAPI(
-    title="논문 업로드 및 벡터화 API",
-    description="PDF 파일을 업로드하면 텍스트를 추출하고 FAISS 벡터 DB로 저장합니다.",
+    title="이번 주 업무 보고서 작성 API",
+    description="업무 기록을 바탕으로 이번 주 업무 보고서를 작성합니다.",
     version="1.0.0",
 )
 
@@ -43,51 +43,34 @@ from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from langchain.schema import Document
-
-# ✅ 요청 스키마
-class PromptRequest(BaseModel):
-    user_request: str
+import json
 
 # ✅ 응답 스키마
 class AnswerResponse(BaseModel):
     report: str
 
-sample_docs = [
-    # 1. 슬랙 대화 내용 예시
-    Document(
-        page_content="로그인 API 성능 개선 작업 완료했습니다. 기존 500ms에서 150ms로 응답 시간 단축했고, 오늘 오후에 배포 예정입니다.",
-        metadata={"source": "Slack #backend-dev 채널"}
-    ),
-    # 2. 노션 회의록 예시
-    Document(
-        page_content="주간 기획 회의록입니다. 신규 '스마트 리포트' 기능의 MVP 범위를 확정했습니다. 주요 기능은 자동 데이터 연동과 템플릿 기반 리포트 생성입니다. UI/UX 디자인은 다음 주까지 초안을 공유하기로 했습니다.",
-        metadata={"source": "Notion - 2025년 9월 3주차 기획 회의"}
-    ),
-    # 3. 또 다른 슬랙 대화 예시
-    Document(
-        page_content="CS팀에서 전달된 '데이터 다운로드 오류' 버그 재현 및 원인 파악 완료. 핫픽스 준비 중이며, 내일 오전 중으로 해결 가능할 것 같습니다.",
-        metadata={"source": "Slack #cs-support 채널"}
-    )
-]
-
-@app.post("/generate-report", response_model=AnswerResponse, summary="프롬프트 기반 질문 처리", tags=["질의 응답"])
-async def generate_report(request: PromptRequest):
-    if request is None:
-        raise HTTPException(status_code=400, detail="인풋이 없습니다.")
-    
+@app.post("/generate-report", response_model=AnswerResponse, summary="이번 주 업무 보고서 작성")
+async def generate_report():
     try:
-        context = "\n\n".join([doc.page_content for doc in sample_docs])
-        global VECTORSTORE
-        VECTORSTORE = build_vector_db(docs=sample_docs)
-        if VECTORSTORE is None:
-            raise HTTPException(status_code=500, detail="벡터 DB가 준비되지 않았습니다.")
-        
-        # 관련 문서 검색
-        related_docs = VECTORSTORE.similarity_search("이번 주에 진행한 업무 보고", k=3) # 요청과 유사한 top3를 가지고 와서 related_docs에 저장
+        # documents.json에서 문서 로드
+        with open("documents.json", "r", encoding="utf-8") as f:
+            json_data = json.load(f)
 
-        print(VECTORSTORE)
-        print(related_docs)
-        
+        # JSON 데이터에서 랜덤으로 3개 선택 후 Document 객체로 변환
+        import random
+        random_items = random.sample(json_data, min(3, len(json_data)))
+        filtered_docs = [
+            Document(page_content=item["page_content"], metadata=item["metadata"])
+            for item in random_items
+        ]
+
+        context = "\n\n".join([doc.page_content for doc in filtered_docs])
+
+        # 현재 날짜 기준으로 이번 주 월~금 계산
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())  # 월요일
+        week_end = week_start + timedelta(days=4)  # 금요일
+
         # 프롬프트 생성
         full_prompt = f"""
             # [역할 부여]
@@ -99,9 +82,9 @@ async def generate_report(request: PromptRequest):
             # [주간업무 보고서 예시 제공]
             # 주간 업무보고서 (예시)
 
-            보고자: OOO  
-            부서: AI 서비스 개발팀  
-            기간: 2025년 9월 8일 ~ 2025년 9월 12일
+            보고자: OOO
+            부서: AI 서비스 개발팀
+            기간: {week_start.strftime('%Y년 %m월 %d일')} ~ {week_end.strftime('%Y년 %m월 %d일')}
 
             ---
 
@@ -128,7 +111,7 @@ async def generate_report(request: PromptRequest):
 
             ---
 
-            ## 3. 차주 계획 (2025년 9월 15일 ~ 9월 19일)
+            ## 3. 차주 계획 ({(week_start + timedelta(days=7)).strftime('%Y년 %m월 %d일')} ~ {(week_end + timedelta(days=7)).strftime('%Y년 %m월 %d일')})
             - 모델 성능 개선 (F1 Score 0.85 이상 달성 목표)
             - 데이터 증강 및 동의어 사전 구축
             - Hard Negative Mining 기법 적용
