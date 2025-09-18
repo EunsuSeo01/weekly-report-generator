@@ -12,6 +12,7 @@ from langchain_openai import OpenAIEmbeddings
 import os
 import build_vector_db
 from build_vector_db import build_vector_db
+from datetime import date
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -81,7 +82,13 @@ async def generate_report(request: PromptRequest):
         if VECTORSTORE is None:
             raise HTTPException(status_code=500, detail="벡터 DB가 준비되지 않았습니다.")
         
-        # 프롬프트 생성 (할루시네이션을 방지하는 문구가 들어있음)
+        # 관련 문서 검색
+        related_docs = VECTORSTORE.similarity_search("이번 주에 진행한 업무 보고", k=3) # 요청과 유사한 top3를 가지고 와서 related_docs에 저장
+
+        print(VECTORSTORE)
+        print(related_docs)
+        
+        # 프롬프트 생성
         full_prompt = f"""
             # [역할 부여]
             당신은 유능한 PM(Project Manager)이자, 여러 업무 기록을 종합하여 핵심을 파악하는 성과 분석 전문가입니다.
