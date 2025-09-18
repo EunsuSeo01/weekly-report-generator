@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 # 페이지 설정
 st.set_page_config(
-    page_title="📊 주간 업무 보고서 생성기",
+    page_title="주간 업무 보고서 생성기",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -122,7 +122,7 @@ with st.sidebar:
     # FastAPI 서버 URL
     api_url = st.text_input(
         "FastAPI 서버 URL",
-        value="http://localhost:8000",
+        value="http://localhost:3306",
         help="FastAPI 서버가 실행되고 있는 주소를 입력하세요"
     )
 
