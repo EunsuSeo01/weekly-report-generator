@@ -24,7 +24,7 @@ class ServerRunner:
                 sys.executable, "-m", "uvicorn",
                 "template:app",
                 "--host", "0.0.0.0",
-                "--port", "8000",
+                "--port", "3306",
                 "--reload"
             ])
         except Exception as e:
@@ -63,7 +63,7 @@ class ServerRunner:
         """두 서버를 모두 실행합니다."""
         print("🚀 주간 업무 보고서 생성기를 시작합니다...")
         print("=" * 60)
-        print("📍 FastAPI 서버: http://localhost:8000")
+        print("📍 FastAPI 서버: http://localhost:3306")
         print("📍 Streamlit 앱: http://localhost:8501")
         print("⚠️  종료하려면 Ctrl+C를 누르세요")
         print("=" * 60)
