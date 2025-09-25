@@ -1,3 +1,9 @@
+"""
+OPENAI API Key 없이 테스트하는 파일입니다.
+llm 조회하는 부분을 주석처리하고 정해진 답변을 반환합니다.
+
+"""
+
 from fastapi import FastAPI, HTTPException, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -34,8 +40,8 @@ embeddings = HuggingFaceEmbeddings(
 
 if not DATABASE_URL:
     raise ValueError("❌ DATABASE_URL 환경 변수가 설정되지 않았습니다.")
-if not OPENAI_API_KEY:
-    raise ValueError("❌ OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+# if not OPENAI_API_KEY:
+#     raise ValueError("❌ OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
 
 # ====================================
 # FastAPI app
@@ -379,13 +385,23 @@ async def admin_rag_query(request: AdminQueryRequest, session: AsyncSession = De
         # 유사 보고서 검색
         similar_reports = await search_similar_reports(request.query, session)
 
-        # RAG 기반 답변 생성
-        rag_response = await manager_rag_chain.ainvoke({
-            "user_query": request.query,
-            "similar_reports": similar_reports
-        })
+        # # RAG 기반 답변 생성
+        # rag_response = await manager_rag_chain.ainvoke({
+        #     "user_query": request.query,
+        #     "similar_reports": similar_reports
+        # })
+        # return ReportResponse(summary=rag_response)
 
-        return ReportResponse(summary=rag_response)
+        # 임시 더미 응답 (LLM 없이)
+        dummy_response = f"""
+        질의: {request.query}
+
+        검색된 유사 보고서:
+        {similar_reports}
+
+        [더미 응답] OpenAI API 연결 후 실제 답변이 생성됩니다.
+        """
+        return ReportResponse(summary=dummy_response)
     except Exception as e:
         return ReportResponse(summary=f"오류가 발생했습니다: {str(e)}")
 

@@ -2,15 +2,12 @@
 -- PostgreSQL database dump
 --
 
---\restrict wIGCzsreYkHyX3smswyIDg6t42CrxQ4M0guKpxBdriQBbyHwY1Y74gJL25iabAE
-
--- Dumped from database version 17.6 (Homebrew)
--- Dumped by pg_dump version 17.6 (Homebrew)
+-- Dumped from database version 14.17 (Homebrew)
+-- Dumped by pg_dump version 14.17 (Homebrew)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
---SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -18,20 +15,6 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
-
---
--- Name: pgaudit; Type: EXTENSION; Schema: -; Owner: -
---
-
---CREATE EXTENSION IF NOT EXISTS pgaudit WITH SCHEMA public;
-
-
---
--- Name: EXTENSION pgaudit; Type: COMMENT; Schema: -; Owner: 
---
-
---COMMENT ON EXTENSION pgaudit IS 'provides auditing functionality';
-
 
 --
 -- Name: vector; Type: EXTENSION; Schema: -; Owner: -
@@ -136,25 +119,39 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.employee (
-    id SERIAL PRIMARY KEY,
-    name varchar(50) NOT NULL,
-    email varchar(100) NOT NULL UNIQUE,
-    password varchar(255) NOT NULL,
+    id integer NOT NULL,
+    name character varying(50) NOT NULL,
+    email character varying(100) NOT NULL,
+    password character varying(255) NOT NULL,
+    job_grade character varying(50)
 );
 
 
 ALTER TABLE public.employee OWNER TO postgres;
 
 --
+-- Name: employee_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.employee ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.employee_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: notion; Type: TABLE; Schema: public; Owner: postgres
 --
 
--- notion 테이블
 CREATE TABLE public.notion (
-    id SERIAL PRIMARY KEY,
-    task_id integer,
+    id integer NOT NULL,
+    task_id character varying(50),
     "timestamp" timestamp without time zone NOT NULL,
-    participant_id varchar(50),
+    participant_id character varying(50),
     content text,
     embedding public.vector(768)
 );
@@ -167,10 +164,10 @@ ALTER TABLE public.notion OWNER TO postgres;
 --
 
 CREATE TABLE public.onedrive (
-    id SERIAL PRIMARY KEY,
-    task_id integer,
+    id integer NOT NULL,
+    task_id character varying(50),
     "timestamp" timestamp without time zone NOT NULL,
-    writer varchar(50),
+    writer character varying(50),
     content text,
     embedding public.vector(768)
 );
@@ -183,11 +180,11 @@ ALTER TABLE public.onedrive OWNER TO postgres;
 --
 
 CREATE TABLE public.outlook (
-    id SERIAL PRIMARY KEY,
-    receiver varchar(50),
-    sender varchar(50) NOT NULL,
+    id integer NOT NULL,
+    receiver character varying(50),
+    sender character varying(50) NOT NULL,
     "timestamp" timestamp without time zone NOT NULL,
-    task_id integer,
+    task_id character varying(50),
     content text,
     embedding public.vector(768)
 );
@@ -200,14 +197,14 @@ ALTER TABLE public.outlook OWNER TO postgres;
 --
 
 CREATE TABLE public.participant (
-    id SERIAL PRIMARY KEY,
+    id integer NOT NULL,
     notion_id integer,
-    p1 varchar(50),
-    p2 varchar(50),
-    p3 varchar(50),
-    p4 varchar(50),
-    p5 varchar(50),
-    p6 varchar(50)
+    p1 character varying(50),
+    p2 character varying(50),
+    p3 character varying(50),
+    p4 character varying(50),
+    p5 character varying(50),
+    p6 character varying(50)
 );
 
 
@@ -218,11 +215,11 @@ ALTER TABLE public.participant OWNER TO postgres;
 --
 
 CREATE TABLE public.report (
-    id SERIAL PRIMARY KEY,
+    id integer NOT NULL,
     task_id integer,
     "timestamp" timestamp without time zone NOT NULL,
-    writer varchar(50),
-    email varchar(100),
+    writer character varying(50),
+    email character varying(100),
     content text
 );
 
@@ -230,15 +227,37 @@ CREATE TABLE public.report (
 ALTER TABLE public.report OWNER TO postgres;
 
 --
+-- Name: report_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.report_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.report_id_seq OWNER TO postgres;
+
+--
+-- Name: report_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.report_id_seq OWNED BY public.report.id;
+
+
+--
 -- Name: slack; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.slack (
-    id SERIAL PRIMARY KEY,
-    receiver varchar(50),
-    sender varchar(50) NOT NULL,
+    id integer NOT NULL,
+    receiver character varying(50),
+    sender character varying(50) NOT NULL,
     "timestamp" timestamp without time zone NOT NULL,
-    task_id integer,
+    task_id character varying(50),
     content text,
     embedding public.vector(768)
 );
@@ -251,25 +270,49 @@ ALTER TABLE public.slack OWNER TO postgres;
 --
 
 CREATE TABLE public.task (
-    id SERIAL PRIMARY KEY,
-    task_uuid varchar(50),
-    description text
+    id integer NOT NULL,
+    description text,
+    embedding public.vector(1536),
+    task_uuid character varying(50)
 );
 
 
 ALTER TABLE public.task OWNER TO postgres;
 
 --
+-- Name: task_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.task ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.task_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: report id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.report ALTER COLUMN id SET DEFAULT nextval('public.report_id_seq'::regclass);
+
+
+--
 -- Data for Name: employee; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.employee (id, name, email, password) FROM stdin;
-1	서은수	eunsuseo@skax.co.kr	1111
-2	윤소현	shyoun@skax.co.kr	2222
-3	박현규	bakhg@skax.co.kr	3333
-4	정도현	dohyunj@skax.co.kr	4444
-5	박범준	parkbj@skax.co.kr	5555
-6	조성호	choseongho@skax.co.kr	6666
+COPY public.employee (id, name, email, password, job_grade) FROM stdin;
+1	서은수	eunsuseo@skax.co.kr	1111	\N
+2	윤소현	shyoun@skax.co.kr	2222	\N
+3	박현규	bakhg@skax.co.kr	3333	\N
+4	정도현	dohyunj@skax.co.kr	4444	\N
+5	박범준	parkbj@skax.co.kr	5555	\N
+6	조성호	choseongho@skax.co.kr	6666	\N
+7	테스트	test@skax.co.kr	1234	\N
+9	김민수	example@skax.kr	$2b$12$I6bVjxzGltdOncJho/vxQOgZZQbbRpcRthc3xispNG3klYv2bQxUu	\N
 \.
 
 
@@ -329,13 +372,23 @@ COPY public.participant (id, notion_id, p1, p2, p3, p4, p5, p6) FROM stdin;
 -- Data for Name: report; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.report (id, task_id, timestamp, writer, email, content) FROM stdin;
-1	1	2025-09-22 14:30:00	김민준	kimminjun@skax.co.kr	로그인 API 성능 개선 작업을 완료했습니다. 기존 500ms에서 150ms로 응답 시간을 단축했고, 오늘 오후에 배포 예정입니다.
-2	2	2025-09-23 11:00:00	박서연	parkseoyeon@skax.co.kr	주간 기획 회의록입니다. 신규 '스마트 리포트' 기능의 MVP 범위를 확정했습니다. UI/UX 디자인은 다음 주까지 초안을 공유하기로 했습니다.
-3	1	2025-09-23 17:45:00	김민준	kimminjun@skax.co.kr	CS팀에서 전달된 '데이터 다운로드 오류' 버그 재현 및 원인 파악 완료. 핫픽스 준비 중이며, 내일 오전 중으로 해결 가능할 것 같습니다.
-4	3	2025-09-24 09:10:00	이수진	leesujin@skax.co.kr	3분기 마케팅 실적 분석 보고서 초안을 공유합니다. 피드백 부탁드립니다.
-5	4	2025-09-24 10:25:00	최준영	choijunyoung@skax.co.kr	알파 프로젝트 관련하여 외부 업체와 미팅을 진행했으며, 견적서를 수령했습니다.
+COPY public.report (id, task_id, "timestamp", writer, email, content) FROM stdin;
+21	1	2025-09-24 05:28:43.580749	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n이번 주 SK하이닉스 스마트 팹 예지보전 플랫폼의 주요 진행 상황은 데이터 수집 파이프라인 구축과 이상 탐지 모델 PoC 범위 확정입니다. 데이터 수집 파이프라인은 설비 PLC 로그, 공정 이력 MES, 장비 이벤트 로그를 소스로 하여 Edge Collector, Kafka, Flink, TimescaleDB를 통해 수집됩니다. 보조 저장소로는 Object Storage가 사용되며, 보안은 사내망 전용 VPC와 TLS로 강화되었습니다. 이상 탐지 모델 PoC는 노광/식각 2개 라인에서 시작하며, Conv-VAE와 STL+MAD 기법을 사용하여 알람 선행 감지 여부를 평가합니다. 운영 대시보드는 Grafana와 TimescaleDB를 사용하여 구성됩니다.\n\n## 2) 사람별 주요 산출물\n- 박현규: Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트 작성\n- 윤소현: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결\n- 서은수: 벤더 로그 사양 수합 및 표준 변환 스키마 확정\n\n## 3) 협업 내역\n서은수, 윤소현, 박현규는 Slack과 Notion을 통해 협업하였습니다. 윤소현은 데이터 수집 파이프라인의 실시간 스트림 연결을 담당하였고, 박현규는 이상 탐지 모델의 학습 스크립트를 작성하였습니다. 서은수는 벤더 로그 사양을 수합하고 표준 변환 스키마를 확정하는 역할을 맡았습니다. 이들은 각자의 역할을 수행하면서도 서로의 진행 상황을 공유하고 조율하였습니다.\n\n## 4) 리스크/이슈\n- 장비 로그 포맷의 비표준화로 인해 ETL 과정에서 지연이 발생할 가능성이 큽니다. 이를 해결하기 위해 공통 스키마(v1)를 우선 도입하고 점진적으로 확장할 계획입니다.\n- SK하이닉스 내부 보안 정책에 따라 네트워크 포트 및 방화벽 승인 절차가 필요합니다.\n\n## 5) 차주 계획\n- 라인 확대와 알람 정책 튜닝 초안을 수립합니다.\n- 공통 스키마(v1)의 필수 및 옵션 필드 목록을 확정하고, 샘플 데이터셋의 1차 라벨 점검을 완료합니다.\n- Kafka 파티션 수를 초기 6에서 트래픽 증가를 가정하여 12까지 확장하는 계획을 실행합니다.\n- TimescaleDB의 하이퍼테이블 청크 및 보조 인덱스 구성을 최적화합니다.
+27	1	2025-09-24 05:51:15.335855	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n이번 주 SK하이닉스 스마트 팹 예지보전 플랫폼의 진행 상황은 다음과 같습니다. 센서 데이터 수집 파이프라인의 구조가 확정되었으며, 노광 및 식각 두 개 라인에서 이상 탐지 모델 PoC를 시작하기로 결정했습니다. 데이터 수집은 Edge Collector에서 Kafka를 통해 TimescaleDB로 이루어지며, 장비 로그의 비표준 포맷 문제로 전처리 표준화 레이어가 필요합니다. 이상 탐지 모델은 Conv-VAE를 사용하여 시계열 데이터를 재구성하고, STL+MAD를 비교군으로 설정하여 성능을 평가합니다. 운영 대시보드는 Grafana와 TimescaleDB를 연동하여 구축됩니다. 이번 주 목표는 수집 파이프라인의 최소 동작과 이상 탐지 PoC의 첫 결과 확보입니다.\n\n## 2) 사람별 주요 산출물\n- 박현규: Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트 작성\n- 윤소현: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결\n- 서은수: 벤더 로그 사양 수합 및 표준 변환 스키마 확정\n\n## 3) 협업 내역\n참여자들은 Slack과 Outlook을 통해 주로 협업하였습니다. 윤소현은 OPC-UA 커넥터 PoC를 진행하며 실시간 스트림 연결을 담당하였고, 박현규는 Conv-VAE 모델의 학습 스크립트를 작성하였습니다. 서은수는 벤더 로그 사양을 수합하고 표준 변환 스키마를 확정하는 역할을 맡았습니다. 이들은 주간 킥오프 회의에서 각자의 진행 상황을 공유하고, 필요한 조치를 논의하였습니다.\n\n## 4) 리스크/이슈\n장비 로그의 포맷이 비표준화되어 ETL 과정에서 지연이 발생할 가능성이 큽니다. 이를 해결하기 위해 공통 스키마(v1)를 우선 도입하고 점진적으로 확장할 계획입니다. 또한, SK하이닉스 내부 보안 정책에 따른 네트워크 포트 및 방화벽 승인 절차가 필요하여 관련 담당자와 협의가 필요합니다.\n\n## 5) 차주 계획\n다음 주에는 라인 확대와 알람 정책 튜닝 초안을 수립할 예정입니다. 또한, 장비 로그의 표준화 작업을 지속하여 ETL 지연 문제를 해결하고, 이상 탐지 모델의 성능을 개선하기 위한 추가적인 실험을 진행할 계획입니다.
+28	4	2025-09-24 05:51:24.216836	박현규	bakhg@skax.co.kr	# 업무 4: 카카오브레인 LLM 데이터 파이프라인 주간 보고서\n\n## 1) 주간 요약\n이번 주 Kakao Brain과 SK AX의 주간 싱크에서는 카카오브레인 LLM 데이터 파이프라인의 진행 상황에 대해 논의가 이루어졌습니다. 주요 안건으로는 데이터 수집 현황, 정제 룰셋, 그리고 I/O 병목 현상이 다뤄졌습니다. 회의는 온라인으로 Teams 플랫폼을 통해 진행되었으며, 참석자는 윤소현과 박현규였습니다.\n\n## 2) 사람별 주요 산출물\n- 박현규: 데이터 정제 룰셋 초안 작성 및 I/O 병목 현상에 대한 분석 보고서 제출.\n\n## 3) 협업 내역\n- 윤소현과 박현규는 Slack을 통해 데이터 수집 현황에 대한 실시간 업데이트를 주고받았습니다. \n- Notion을 활용하여 데이터 정제 룰셋의 초안을 공동으로 작성하고 피드백을 주고받았습니다.\n- Outlook을 통해 회의 일정을 조율하고 주요 안건을 사전에 공유했습니다.\n- OneDrive를 통해 데이터 분석 보고서 및 관련 자료를 공유하며 협업을 진행했습니다.\n\n## 4) 리스크/이슈\n- I/O 병목 현상이 데이터 처리 속도를 저하시키고 있어 이에 대한 해결책이 필요합니다.\n- 데이터 정제 룰셋이 아직 초안 단계에 머물러 있어, 구체적인 기준과 절차의 확립이 요구됩니다.\n\n## 5) 차주 계획\n- I/O 병목 현상 해결을 위한 기술적 대안 모색 및 테스트 진행.\n- 데이터 정제 룰셋의 세부 기준 확립 및 최종안 작성.\n- 데이터 수집 프로세스의 효율성을 높이기 위한 추가적인 방안 검토.
+22	4	2025-09-24 05:28:52.719271	박현규	bakhg@skax.co.kr	# 업무 4: 카카오브레인 LLM 데이터 파이프라인 주간 보고서\n\n## 1) 주간 요약\n이번 주 Kakao Brain x SK AX 주간 싱크에서는 카카오브레인 LLM 데이터 파이프라인의 진행 상황에 대해 논의했습니다. 주요 안건은 데이터 수집 현황, 정제 룰셋, 그리고 I/O 병목 현상에 대한 공유였습니다. 윤소현과 박현규가 참석하여 온라인으로 진행된 회의에서 데이터 수집의 현재 상태와 정제 과정에서의 문제점, 그리고 데이터 처리 속도를 저해하는 I/O 병목 현상에 대해 심도 있는 논의가 이루어졌습니다.\n\n## 2) 사람별 주요 산출물\n- 박현규: 데이터 정제 룰셋 초안 작성 및 I/O 병목 현상 분석 보고서 작성\n\n## 3) 협업 내역\n윤소현과 박현규는 Slack과 Notion을 통해 지속적으로 소통하며 데이터 파이프라인의 문제점을 공유하고 해결 방안을 모색했습니다. 윤소현은 데이터 수집 현황을 정리하여 공유하였고, 박현규는 이를 바탕으로 정제 룰셋을 작성하였습니다. 또한, I/O 병목 현상에 대한 분석 결과를 Notion에 게시하여 팀원들과 공유하였습니다.\n\n## 4) 리스크/이슈\n현재 데이터 파이프라인에서 I/O 병목 현상이 발생하여 데이터 처리 속도가 저하되고 있습니다. 이로 인해 전체 프로젝트 일정에 차질이 생길 가능성이 있습니다. 또한, 데이터 정제 룰셋이 아직 초안 단계에 머물러 있어 추가적인 검토와 수정이 필요합니다.\n\n## 5) 차주 계획\n다음 주에는 I/O 병목 현상을 해결하기 위한 기술적 대안을 모색하고, 데이터 정제 룰셋을 최종 확정하는 작업이 필요합니다. 이를 위해 추가적인 팀 회의를 통해 다양한 해결 방안을 논의하고, 각 팀원이 맡은 부분에 대한 진행 상황을 점검할 예정입니다.
+23	1	2025-09-24 05:39:48.459337	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n죄송합니다. 제공된 context가 없어 요청하신 내용을 작성할 수 없습니다. 필요한 정보를 제공해 주시면 도움을 드리겠습니다.
+24	1	2025-09-24 05:48:58.075097	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n이번 주 SK하이닉스 스마트 팹 예지보전 플랫폼 프로젝트에서는 데이터 수집 파이프라인 구축과 이상 탐지 모델 PoC의 초기 설정이 주요 논의 주제였습니다. 데이터 수집 파이프라인은 설비 PLC 로그, 공정 이력 MES, 장비 이벤트 로그를 소스로 하여 Edge Collector, Kafka, Stream Processor, TimescaleDB로 이어지는 구조로 확정되었습니다. 이상 탐지 모델 PoC는 노광/식각 두 개 라인에서 시작하며, Conv-VAE 기반의 시계열 Reconstruction과 STL+MAD를 비교하여 알람 선행 감지 여부를 평가합니다. 이번 주 목표는 '수집 파이프라인 최소 동작'과 '이상 탐지 PoC 첫 결과' 확보입니다.\n\n## 2) 사람별 주요 산출물\n- **박현규**: Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트 작성.\n- **윤소현**: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결.\n- **서은수**: 벤더 로그 사양 수합 및 표준 변환 스키마 확정.\n\n## 3) 협업 내역\n- **Slack**: 팀원들 간의 실시간 커뮤니케이션 도구로 사용되어, 데이터 수집 파이프라인과 이상 탐지 모델 관련 논의가 이루어졌습니다.\n- **Notion**: 프로젝트 진행 상황과 주요 산출물, 액션 아이템 등을 기록하고 공유하는 데 사용되었습니다.\n- **Outlook**: 회의 일정 조율 및 회의록 공유에 활용되었습니다.\n- **OneDrive**: 산출물 및 관련 문서의 저장과 공유를 위한 플랫폼으로 사용되었습니다.\n\n## 4) 리스크/이슈\n- 장비 로그 포맷이 비표준화되어 있어 ETL 과정에서 지연이 발생할 가능성이 큽니다. 이를 해결하기 위해 공통 스키마(v1)를 우선 도입하고 점진적으로 확장할 계획입니다.\n- SK하이닉스 내부 보안 정책에 따라 네트워크 포트 및 방화벽 승인 절차가 필요하며, 이로 인한 일정 지연 가능성이 있습니다.\n\n## 5) 차주 계획\n- 데이터 수집 파이프라인의 라인 확대와 안정화 작업을 진행합니다.\n- 이상 탐지 모델의 알람 정책 튜닝 초안을 수립하고, PoC 결과를 바탕으로 모델 성능을 개선합니다.\n- 장비 로그 포맷 표준화를 위한 전처리 표준화 레이어 개발을 진행합니다.\n- 네트워크 포트 및 방화벽 승인 절차를 완료하여 보안 문제를 해결합니다.
+25	1	2025-09-24 05:49:20.256598	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n이번 주 SK하이닉스 스마트 팹 예지보전 플랫폼 프로젝트에서는 센서 데이터 수집 파이프라인 구축과 이상 탐지 모델 PoC 범위 확정이 주요 논의 사항이었다. 데이터 수집 파이프라인은 설비 PLC 로그, 공정 이력 MES, 장비 이벤트 로그를 소스로 하여 Edge Collector, Kafka, Stream Processor, 시계열DB로 구성되었으며, 보조 저장소로 Object Storage를 사용한다. 이상 탐지 모델 PoC는 노광/식각 2개 라인에서 주요 센서 12종을 대상으로 Conv-VAE와 STL+MAD 기법을 비교하여 평가한다. 운영 대시보드는 Grafana를 활용하여 설비 가동률, 알람, 이상 점수 등을 시각화한다. 주요 목표는 수집 파이프라인의 최소 동작과 이상 탐지 PoC의 첫 결과 확보이다.\n\n## 2) 사람별 주요 산출물\n- **박현규**: Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트 준비.\n- **윤소현**: OPC-UA 커넥터 PoC로 3개 설비의 실시간 스트림 연결 작업.\n- **서은수**: 벤더 로그 사양 수합 및 표준 변환 스키마 확정.\n\n## 3) 협업 내역\n참여자들은 Slack, Notion, Outlook, OneDrive를 통해 협업했다. 윤소현은 OPC-UA 커넥터 PoC 작업을 진행하며 실시간 스트림 연결을 담당했고, 박현규는 Conv-VAE 학습 스크립트를 작성하여 모델 개발을 지원했다. 서은수는 벤더 로그 사양을 수합하고 표준 변환 스키마를 확정하여 데이터 전처리 표준화를 추진했다. 이들은 주간 킥오프 회의를 통해 진행 상황을 공유하고, 각자의 작업을 조율하며 협업을 이어갔다.\n\n## 4) 리스크/이슈\n- 장비 로그 포맷이 비표준화되어 있어 ETL 과정에서 지연이 발생할 가능성이 크다. 이를 해결하기 위해 공통 스키마(v1)를 우선 도입하고 점진적으로 확장할 계획이다.\n- SK하이닉스 내부 보안 정책에 따른 네트워크 포트 및 방화벽 승인 절차가 필요하며, 담당자에게 전달된 상태이다.\n\n## 5) 차주 계획\n다음 주에는 라인 확대와 알람 정책 튜닝 초안을 수립할 계획이다. 이를 위해 데이터 수집 파이프라인의 안정성을 높이고, 이상 탐지 모델의 성능을 평가하여 개선점을 도출할 예정이다. 또한, 변환 스키마 v1의 필수 및 옵션 필드 목록을 확정하고 샘플 데이터셋의 1차 라벨 점검을 진행할 계획이다.
+26	4	2025-09-24 05:49:27.743756	박현규	bakhg@skax.co.kr	# 업무 4: 카카오브레인 LLM 데이터 파이프라인 주간 보고서\n\n## 1) 주간 요약\n이번 주 Kakao Brain과 SK AX 간의 주간 싱크 회의에서는 LLM 데이터 파이프라인의 수집 현황, 정제 룰셋, I/O 병목 현상에 대한 논의가 이루어졌습니다. 윤소현과 박현규가 참석하여 데이터 수집의 진행 상황을 점검하고, 데이터 정제 과정에서의 룰셋 적용 방법을 검토했습니다. 또한, I/O 병목 현상이 발생하는 부분을 공유하고 이를 해결하기 위한 방안을 모색했습니다.\n\n## 2) 사람별 주요 산출물\n- 박현규: 데이터 정제 룰셋 초안 작성 및 I/O 병목 현상 분석 보고서 작성\n\n## 3) 협업 내역\n윤소현과 박현규는 Teams를 통해 온라인 회의를 진행하며 데이터 수집 및 정제에 대한 의견을 교환했습니다. 박현규는 Notion에 데이터 정제 룰셋 초안을 공유하였고, 윤소현은 이에 대한 피드백을 제공했습니다. 또한, Slack을 통해 실시간으로 수집된 데이터를 검토하고, Outlook을 통해 회의 일정을 조율했습니다.\n\n## 4) 리스크/이슈\n현재 데이터 파이프라인에서 I/O 병목 현상이 발생하고 있어 데이터 처리 속도가 저하되고 있습니다. 이로 인해 전체 프로젝트 일정에 차질이 생길 가능성이 있으며, 이를 해결하기 위한 기술적 지원이 필요합니다. 또한, 데이터 정제 룰셋의 세부 항목에 대한 합의가 아직 이루어지지 않아 추가적인 논의가 필요합니다.\n\n## 5) 차주 계획\n다음 주에는 I/O 병목 현상을 해결하기 위한 기술적 방안을 구체화하고, 이를 테스트할 계획입니다. 또한, 데이터 정제 룰셋에 대한 최종 합의를 도출하고, 이를 바탕으로 정제 작업을 시작할 예정입니다. 추가적으로, 데이터 수집의 효율성을 높이기 위한 방안을 모색할 것입니다.
+29	1	2025-09-24 06:12:43.241856	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n이번 주에는 SK하이닉스 스마트 팹 예지보전 플랫폼의 데이터 수집 파이프라인 구축과 이상 탐지 모델 PoC 범위를 확정하는 데 중점을 두었습니다. 데이터 수집 파이프라인은 설비 PLC 로그, 공정 이력 MES, 장비 이벤트 로그를 소스로 하여 Edge Collector, Kafka, Stream Processor, 시계열DB로 구성되었습니다. 이상 탐지 모델 PoC는 노광/식각 2개 라인과 주요 센서 12종을 대상으로 하며, Conv-VAE와 STL+MAD 기법을 사용하여 알람 검출 시점, 과검출율 등을 평가합니다. 운영 대시보드는 Grafana와 TimescaleDB를 연동하여 라인별 설비가동률, 알람 Top-5 등을 모니터링합니다. 이번 주의 목표는 '수집 파이프라인 최소 동작'과 '이상 탐지 PoC 첫 결과' 확보입니다.\n\n## 2) 사람별 주요 산출물\n- 윤소현: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결\n- 서은수: 벤더 로그 사양 수합 및 표준 변환 스키마 확정\n- 박현규: Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트 작성\n\n## 3) 협업 내역\n참여자들은 Slack과 Outlook을 통해 주간 킥오프 회의를 진행하며, Notion에 회의록과 진행 상황을 기록했습니다. 윤소현은 OPC-UA 커넥터 PoC를 통해 실시간 스트림 연결을 담당했고, 서은수는 벤더 로그 사양을 수합하여 표준 변환 스키마를 확정했습니다. 박현규는 Conv-VAE 학습 스크립트를 작성하고 베이스라인 리포트를 작성하여 팀과 공유했습니다.\n\n## 4) 리스크/이슈\n장비 로그 포맷의 비표준화로 인해 ETL 과정에서 지연이 발생할 가능성이 큽니다. 이를 해결하기 위해 공통 스키마(v1)를 우선 도입하고 점진적으로 확장할 계획입니다. 또한, SK하이닉스 내부 보안 정책에 따른 네트워크 포트/방화벽 승인 절차가 필요하며, 담당자에게 이를 전달받았습니다.\n\n## 5) 차주 계획\n다음 주에는 라인 확대와 알람 정책 튜닝 초안을 수립할 계획입니다. 이를 위해 데이터 수집 파이프라인의 안정성을 검토하고, 이상 탐지 모델의 성능을 평가하여 개선점을 도출할 예정입니다. 또한, 변환 스키마의 필수/옵션 필드 목록을 확정하고, 샘플 데이터셋의 1차 라벨 점검을 진행할 계획입니다.
+30	1	2025-09-24 06:15:24.744	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n이번 주 SK하이닉스 스마트 팹 예지보전 플랫폼 관련 진행 상황은 다음과 같습니다. 센서 데이터 수집 파이프라인의 구조가 확정되었으며, 노광 및 식각 두 개 라인에서 PoC를 시작하기로 결정했습니다. 주요 센서 12종에 대해 이상 탐지 모델을 적용할 계획이며, Conv-VAE 기반의 시계열 Reconstruction과 STL+MAD를 비교하여 임계값을 설정할 예정입니다. 또한, 운영 대시보드의 지표와 기술 스택이 확정되었습니다. 이번 주의 목표는 수집 파이프라인의 최소 동작과 이상 탐지 PoC의 첫 결과를 확보하는 것이었습니다.\n\n## 2) 사람별 주요 산출물\n- 서은수: 벤더 로그 사양 수합 및 표준 변환 스키마 확정\n- 박현규: Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트 작성\n- 윤소현: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결\n\n## 3) 협업 내역\n참여자들은 Slack, Notion, Outlook, OneDrive를 통해 협업을 진행했습니다. 서은수는 벤더 로그 사양을 수합하고 표준 변환 스키마를 확정하는 데 주력했으며, 박현규는 Conv-VAE 모델의 학습 스크립트를 작성하고 성능을 평가하는 베이스라인 리포트를 작성했습니다. 윤소현은 OPC-UA 커넥터를 통해 3개 설비의 실시간 스트림 연결을 담당했습니다. 이들은 주간 킥오프 회의를 통해 진행 상황을 공유하고, 각자의 작업 내용을 조율했습니다.\n\n## 4) 리스크/이슈\n장비 로그 포맷의 비표준화로 인해 ETL 과정에서 지연이 발생할 가능성이 큽니다. 이를 해결하기 위해 공통 스키마(v1)를 우선 도입하고 점진적으로 확장할 계획입니다. 또한, SK하이닉스 내부 보안 정책에 따른 네트워크 포트 및 방화벽 승인 절차가 필요하며, 관련 담당자에게 전달되었습니다.\n\n## 5) 차주 계획\n다음 주에는 라인 확대와 알람 정책 튜닝 초안을 수립할 예정입니다. 이를 위해 데이터 수집 파이프라인의 안정성을 높이고, PoC 결과를 바탕으로 알람 검출의 선행시간과 과검출률을 개선하는 작업이 필요합니다. 또한, 변환 스키마 v1의 필수 및 옵션 필드 목록을 확정하고, 샘플 데이터셋의 1차 라벨 점검을 진행할 계획입니다.
+31	1	2025-09-24 06:25:48.411496	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n\n**Task 1: SK하이닉스 스마트 팹 예지보전 플랫폼 진행 상황**\n\n- **센서 샘플 JSON 요청**: Conv-VAE 입력 시퀀스 길이 조정을 위해 필요.\n- **PoC 시작 라인**: 노광/식각 2개 라인에서 시작, 알람 선행 감지 여부 확인 필요.\n- **모델 임계값 설정**: Reconstruction 에러 기반 임계값 설정 후 STL+MAD 비교 예정.\n\n**회의: SK하이닉스 스마트 팹 예지보전 주간 킥오프 (Week of 0922)**\n- **참석자**: 서은수(PM), 윤소현(Data Eng), 박현규(AI Dev)\n- **목적**: 센서 데이터 수집 파이프라인 구축 진행 상황 점검 및 이상 탐지 모델 PoC 범위 확정.\n\n**안건 및 논의 사항**\n\n1. **데이터 수집 파이프라인 구조 확정**\n   - **소스**: 설비 PLC 로그(OPC-UA), 공정 이력 MES, 장비 이벤트 로그(벤더 포맷)\n   - **수집**: Edge Collector → Kafka → Stream Processor(Flink) → 시계열DB(TimescaleDB)\n   - **보조**: Object Storage(S3-호환) 30일 핫/180일 콜드 정책\n   - **보안**: 사내망 전용 VPC, 전송 구간 TLS, PII 없음 확인\n   - **리스크**: 장비 로그 포맷 비표준으로 전처리 표준화 레이어 필요\n\n2. **이상 탐지 모델 PoC 범위**\n   - **대상**: 노광/식각 2개 라인, 주요 센서 12종\n   - **레이블**: 설비 알람/정지 이벤트를 약한 라벨로 활용\n   - **기법**: 시계열 Reconstruction(Conv-VAE) + 변동성 기반 Thresholding, STL 분해 + MAD 비교\n   - **평가**: 알람 검출 시점, 과검출율, 주당 알람 건수 제한 정책\n\n3. **운영 대시보드**\n   - **지표**: 라인별 설비가동률(OEE), 알람 Top-5, 이상Score 분포, 센서별 Drift 트렌드\n   - **기술**: Grafana + TimescaleDB + Alertmanager 연동\n\n**액션아이템**\n- 윤소현: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결 (9/24)\n- 박현규: Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트 (9/25)\n- 서은수: 벤더 로그 사양 수합, 표준 변환 스키마 확정 (9/26)\n\n**의존성 및 이슈**\n- 장비 로그 포맷 미통일로 ETL 지연 가능성\n- SK하이닉스 내부 보안 정책에 따른 네트워크 포트/방화벽 승인 절차 필요\n\n**추가 논의**\n- Kafka 파티션 수 초기 6, 트래픽 증가 시 12까지 확장 계획\n- TimescaleDB 하이퍼테이블 청크 1일, 보조 인덱스 구성\n- 변환 스키마 v1 필수/옵션 필드 목록 확정 및 샘플 데이터셋 라벨 점검 일정 확정\n\n**성능 목표**\n- 쓰기 TPS 2배 개선, 대시보드 렌더링 지연 1.5초 이내 유지\n- 알람 과검출률 15% 이하, 선행시간 +5분 이상 확보\n\n**결론**\n- 이번 주 목표: '수집 파이프라인 최소 동작'과 '이상 탐지 PoC 첫 결과' 확보\n- 다음 주 목표: 라인 확대와 알람 정책 튜닝 초안 수립\n\n## 2) 사람별 주요 산출물\n\n- **박현규**: Conv-VAE 기본 구조 학습 스크립트 및 베이스라인 리포트\n- **서은수**: 벤더 로그 사양 수합 및 표준 변환 스키마 확정\n- **윤소현**: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결\n\n## 3) 협업 내역\n\n- **Slack/Notion/Outlook/OneDrive 기록 기반 협업 내역 정리**: 각종 협업 도구를 통해 실시간으로 진행 상황 공유 및 피드백 교환.\n\n## 4) 리스크/이슈\n\n- **장비 로그 포맷 미통일**: ETL 지연 가능성, 전처리 표준화 레이어 필요.\n- **보안 승인 절차**: SK하이닉스 내부 보안 정책에 따른 네트워크 포트/방화벽 승인 절차 필요.\n\n## 5) 차주 계획\n\n- **후속 작업 및 개선점**:\n  - 수집 파이프라인 안정화 및 성능 최적화\n  - PoC 결과 분석 및 모델 개선\n  - 알람 정책 튜닝 초안 수립 및 테스트\n\n(기간: 2025-09-22T09:14:22 ~ 2025-09-27T09:14:22)
+32	1	2025-09-24 06:34:15.18509	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n\n**Task 1 (SK하이닉스 스마트 팹 예지보전 플랫폼) 관련 진행 상황 요약:**\n\n- **센서 샘플 JSON 요청:** Conv-VAE 입력 시퀀스 길이 조정을 위해 센서 샘플 JSON 요청.\n- **PoC 시작:** 노광/식각 2개 라인부터 PoC 시작, 알람 선행 감지 여부 확인 필요.\n- **모델 임계값 설정:** Reconstruction 에러 기반 임계값 설정 후 STL+MAD 비교 예정.\n\n**회의명:** SK하이닉스 스마트 팹 예지보전 주간 킥오프(Week of 0922)  \n**참석자:** 서은수(PM), 윤소현(Data Eng), 박현규(AI Dev)  \n**목적:** 센서 데이터 수집 파이프라인 구축 진행 상황 점검 및 이상 탐지 모델 PoC 범위 확정.\n\n**[안건1] 데이터 수집 파이프라인 구조 확정**\n- **소스:** 설비 PLC 로그(OPC-UA), 공정 이력 MES, 장비 이벤트 로그(벤더 포맷)\n- **수집:** Edge Collector → Kafka → Stream Processor(Flink) → 시계열DB(TimescaleDB)\n- **보조:** Object Storage(S3-호환) 30일 핫/180일 콜드 정책\n- **보안:** 사내망 전용 VPC + SK AX Bastion, 전송 구간 TLS, PII 없음 확인\n- **리스크:** 장비 로그 포맷 비표준 → 전처리 표준화 레이어 필요\n\n**[안건2] 이상 탐지 모델 PoC 범위**\n- **1차 대상:** 노광/식각 2개 라인, 주요 센서 12종\n- **레이블:** 설비 알람/정지 이벤트를 약한 라벨로 활용\n- **기법:** 시계열 Reconstruction(Conv-VAE) + 변동성 기반 Thresholding, 비교군으로 STL 분해 + MAD 기준치\n- **평가:** 알람 검출 시점, 과검출율, 주당 알람 건수 제한 정책\n\n**[안건3] 운영 대시보드**\n- **지표:** 라인별 설비가동률(OEE), 알람 Top-5, 이상Score 분포, 센서별 Drift 트렌드\n- **기술:** Grafana + TimescaleDB + Alertmanager 연동\n\n**[액션아이템]**\n- **윤소현:** OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결(9/24)\n- **박현규:** Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트(9/25)\n- **서은수:** 벤더 로그 사양 수합, 표준 변환 스키마 확정(9/26)\n\n**[의존성 및 이슈]**\n- 장비 로그 포맷 미통일로 ETL 지연 가능성 → 공통 스키마(v1) 우선 도입 후 점진 확장\n- SK하이닉스 내부 보안 정책에 따른 네트워크 포트/방화벽 승인 절차 필요\n\n**[추가 논의]**\n- Kafka 파티션 수 초기 6, 일일 1.5배 증가 트래픽 가정 시 12까지 확장 계획\n- TimescaleDB 하이퍼테이블 청크 1일, 보조 인덱스는 line, tool_id, sensor 조합으로 구성\n- 변환 스키마 v1 필수/옵션 필드 목록 확정 및 샘플 데이터셋 1차 라벨 점검 일정 확정\n\n**[성능 목표]**\n- 쓰기 TPS 2배 개선, 대시보드 렌더링 지연 1.5초 이내 유지\n- 알람 과검출률 15% 이하, 선행시간 +5분 이상 확보 목표\n\n**[결론]**\n- 이번 주 목표는 '수집 파이프라인 최소 동작'과 '이상 탐지 PoC 첫 결과' 확보.\n- 다음 주 목표는 라인 확대와 알람 정책 튜닝 초안 수립.\n\n## 2) 사람별 주요 산출물\n\n- **서은수:** 벤더 로그 사양 수합, 표준 변환 스키마 확정\n- **박현규:** Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트\n- **윤소현:** OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결\n\n## 3) 협업 내역\n\n- **Slack/Notion/Outlook/OneDrive 기록 기반 협업 내역 정리:** 주간 회의 및 액션 아이템 공유, 진행 상황 업데이트 및 피드백 교환.\n\n## 4) 리스크/이슈\n\n- **문제점:** 장비 로그 포맷 비표준으로 인한 ETL 지연 가능성\n- **리스크:** SK하이닉스 내부 보안 정책에 따른 네트워크 포트/방화벽 승인 절차 필요\n- **해결 필요 사항:** 공통 스키마(v1) 도입 및 점진 확장, 보안 승인 절차 진행\n\n## 5) 차주 계획\n\n- **후속 작업 및 개선점:**\n  - 라인 확대 및 알람 정책 튜닝 초안 수립\n  - 공통 스키마(v1) 도입 및 ETL 프로세스 개선\n  - 보안 승인 절차 완료 및 네트워크 설정 최적화\n\n(기간: 2025-09-22T09:14:22 ~ 2025-09-27T09:14:22)
+33	4	2025-09-24 06:34:21.075596	박현규	bakhg@skax.co.kr	# 업무 4: 카카오브레인 LLM 데이터 파이프라인 주간 보고서\n\n## 1) 주간 요약\n이번 주에는 Task 4와 관련하여 카카오브레인과 SK AX 간의 주간 싱크 회의가 진행되었습니다. 회의에서는 데이터 수집 현황, 정제 룰셋, I/O 병목 현상에 대한 논의가 이루어졌습니다. 회의는 온라인으로 Teams를 통해 진행되었으며, 윤소현과 박현규가 참석하였습니다.\n\n## 2) 사람별 주요 산출물\n- 박현규: 회의에서 논의된 내용을 바탕으로 데이터 파이프라인 개선 방안 초안 작성.\n\n## 3) 협업 내역\n이번 주에는 Slack, Notion, Outlook, OneDrive를 활용하여 협업이 이루어졌습니다. 각 플랫폼을 통해 회의 일정 조율, 문서 공유, 피드백 수렴 등의 활동이 진행되었습니다.\n\n## 4) 리스크/이슈\n현재 데이터 파이프라인에서 I/O 병목 현상이 발생하고 있으며, 이를 해결하기 위한 방안이 필요합니다. 또한, 데이터 정제 룰셋에 대한 추가적인 검토가 요구됩니다.\n\n## 5) 차주 계획\n다음 주에는 I/O 병목 현상을 해결하기 위한 구체적인 방안을 마련하고, 데이터 정제 룰셋을 최종 확정할 계획입니다. 이를 위해 추가적인 회의와 검토 작업이 예정되어 있습니다.
+34	1	2025-09-24 07:00:00.849372	박현규	bakhg@skax.co.kr	# 업무 1: SK하이닉스 스마트 팹 예지보전 플랫폼 주간 보고서\n\n## 1) 주간 요약\n\n### Task 1: SK하이닉스 스마트 팹 예지보전 플랫폼 진행 상황\n- **센서 샘플 JSON**: Conv-VAE 입력 시퀀스 길이 조정을 위해 샘플 요청.\n- **PoC 시작**: 노광/식각 2개 라인에서 시작, 알람 선행 감지 여부 확인 필수.\n- **모델 기법**: Reconstruction 에러 기반 임계값 설정, STL+MAD 비교 검토.\n- **회의**: SK하이닉스 스마트 팹 예지보전 주간 킥오프(Week of 0922)\n  - **참석자**: 서은수(PM), 윤소현(Data Eng), 박현규(AI Dev)\n  - **목적**: 센서 데이터 수집 파이프라인 구축 진행 상황 점검 및 이상 탐지 모델 PoC 범위 확정.\n\n#### 안건 1: 데이터 수집 파이프라인 구조 확정\n- **소스**: 설비 PLC 로그(OPC-UA), 공정 이력 MES, 장비 이벤트 로그(벤더 포맷)\n- **수집**: Edge Collector → Kafka → Stream Processor(Flink) → TimescaleDB\n- **보조**: Object Storage(S3-호환) 30일 핫/180일 콜드 정책\n- **보안**: 사내망 전용 VPC + SK AX Bastion, 전송 구간 TLS, PII 없음 확인\n- **리스크**: 장비 로그 포맷 비표준으로 전처리 표준화 레이어 필요\n\n#### 안건 2: 이상 탐지 모델 PoC 범위\n- **1차 대상**: 노광/식각 2개 라인, 주요 센서 12종\n- **레이블**: 설비 알람/정지 이벤트를 약한 라벨로 활용\n- **기법**: 시계열 Reconstruction(Conv-VAE) + 변동성 기반 Thresholding, STL 분해 + MAD 기준치\n- **평가**: 알람 검출 시점, 과검출율, 주당 알람 건수 제한 정책\n\n#### 안건 3: 운영 대시보드\n- **지표**: 라인별 설비가동률(OEE), 알람 Top-5, 이상 Score 분포, 센서별 Drift 트렌드\n- **기술**: Grafana + TimescaleDB + Alertmanager 연동\n\n#### 액션아이템\n- **윤소현**: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결(9/24)\n- **박현규**: Conv-VAE 기본 구조 학습 스크립트 작성 및 베이스라인 리포트(9/25)\n- **서은수**: 벤더 로그 사양 수합, 표준 변환 스키마 확정(9/26)\n\n#### 의존성 및 이슈\n- 장비 로그 포맷 미통일로 ETL 지연 가능성 → 공통 스키마(v1) 우선 도입\n- 네트워크 포트/방화벽 승인 절차 필요\n\n#### 추가 논의\n- Kafka 파티션 수 확장 계획\n- TimescaleDB 하이퍼테이블 청크 및 보조 인덱스 구성\n- 변환 스키마 v1 필수/옵션 필드 목록 및 샘플 데이터셋 라벨 점검 일정 확정\n\n#### 성능 목표\n- 쓰기 TPS 2배 개선, 대시보드 렌더링 지연 1.5초 이내 유지\n- 알람 과검출률 15% 이하, 선행시간 +5분 이상 확보\n\n#### 결론\n- 이번 주 목표: '수집 파이프라인 최소 동작'과 '이상 탐지 PoC 첫 결과' 확보\n- 다음 주 목표: 라인 확대와 알람 정책 튜닝 초안 수립\n\n## 2) 사람별 주요 산출물\n\n- **서은수**: 벤더 로그 사양 수합 및 표준 변환 스키마 확정\n- **박현규**: Conv-VAE 기본 구조 학습 스크립트 및 베이스라인 리포트 작성\n- **윤소현**: OPC-UA 커넥터 PoC로 3개 설비 실시간 스트림 연결\n\n## 3) 협업 내역\n\n- **Slack/Notion/Outlook/OneDrive** 기록 기반으로 협업 내역 정리\n\n## 4) 리스크/이슈\n\n- **문제점**: 장비 로그 포맷 미통일로 인한 ETL 지연 가능성\n- **리스크**: 네트워크 포트/방화벽 승인 절차 필요\n- **해결 필요 사항**: 공통 스키마(v1) 우선 도입 및 점진 확장\n\n## 5) 차주 계획\n\n- **후속 작업**: 라인 확대 및 알람 정책 튜닝 초안 수립\n- **개선점**: 데이터 수집 파이프라인 및 이상 탐지 모델 최적화\n\n(기간: 2025-09-22T09:14:22 ~ 2025-09-27T09:14:22)
 \.
+
 
 --
 -- Data for Name: slack; Type: TABLE DATA; Schema: public; Owner: postgres
@@ -469,12 +522,33 @@ COPY public.slack (id, receiver, sender, "timestamp", task_id, content, embeddin
 -- Data for Name: task; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.task (id, task_uuid, description) FROM stdin;
-1	t001	SK하이닉스 스마트 팹 예지보전 플랫폼
-2	t002	현대자동차 디지털 트윈 기반 스마트팩토
-3	t003	신한은행 오픈뱅킹 ERP 연동
-4	t004	카카오브레인 LLM 데이터 파이프라인
+COPY public.task (id, description, embedding, task_uuid) FROM stdin;
+1	SK하이닉스 스마트 팹 예지보전 플랫폼	\N	t001
+2	현대자동차 디지털 트윈 기반 스마트팩토리	\N	t002
+3	신한은행 오픈뱅킹 ERP 연동	\N	t003
+4	카카오브레인 LLM 데이터 파이프라인	\N	t004
 \.
+
+
+--
+-- Name: employee_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.employee_id_seq', 9, true);
+
+
+--
+-- Name: report_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.report_id_seq', 34, true);
+
+
+--
+-- Name: task_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.task_id_seq', 4, true);
 
 
 --
@@ -576,27 +650,8 @@ CREATE INDEX outlook_embedding_idx ON public.outlook USING ivfflat (embedding pu
 
 CREATE INDEX slack_embedding_idx ON public.slack USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='5');
 
-ALTER TABLE public.employee
-ADD COLUMN job_grade varchar(50);
-
-
---
--- Add job_grade
---
-
-UPDATE public.employee
-SET job_grade = '매니저';
-
-INSERT INTO public.employee (name, email, password, job_grade)
-VALUES 
-('김민준', 'kimminjun@skax.co.kr', 'default1234', '관리자'),
-('박서연', 'parkseoyeon@skax.co.kr', 'default1234', '관리자'),
-('이수진', 'leesujin@skax.co.kr', 'default1234', '관리자'),
-('최준영', 'choijunyoung@skax.co.kr', 'default1234', '관리자');
 
 --
 -- PostgreSQL database dump complete
 --
-
---\unrestrict wIGCzsreYkHyX3smswyIDg6t42CrxQ4M0guKpxBdriQBbyHwY1Y74gJL25iabAE
 
