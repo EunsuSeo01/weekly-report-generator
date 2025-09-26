@@ -144,6 +144,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# venv
+.venv_weekly_report
+venv_weekly_report/
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -232,3 +236,6 @@ data/
 conf.d/
 initdb.d/
 bak/
+
+GEMINI.md
+CLAUDE.md

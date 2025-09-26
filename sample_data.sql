@@ -381,7 +381,7 @@ CREATE TABLE public.report (
     writer character varying(50),
     email character varying(100),
     report text,
-    report_embedded public.vector(1536)
+    report_embedded public.vector(768)
 );
 
 
@@ -750,7 +750,7 @@ SELECT pg_catalog.setval('public.participant_id_seq', 1, false);
 -- Name: report_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.report_id_seq', 1, false);
+SELECT pg_catalog.setval('public.report_id_seq', (SELECT COALESCE(MAX(id), 0) FROM public.report), true);
 
 
 --
