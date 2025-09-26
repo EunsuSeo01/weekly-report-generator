@@ -1,18 +1,17 @@
 # 📊 임베딩 기능 구현 문서
 
 > **구현 날짜:** 2025-09-26
-> **구현자:** 조성호
-> **목적:** 보고서 자동 생성 후 임베딩 벡터 생성 및 DB 저장
+> **목적:** 주간 보고서 자동 생성 후 임베딩 벡터 생성 및 DB 저장
 
 ## 🎯 구현 개요
 
 ### 핵심 기능
-- `/api/generate-summary` API에서 보고서 생성 후 **자동 임베딩 생성 및 DB 저장**
-- **임베딩 모델:** `jhgan/ko-sbert-nli` (한국어 특화, 768차원)
-- **기존 보고서 생성 로직 유지**, 임베딩 저장은 추가 기능으로 구현
+- **올바른 위치**: `/reports/weekly` API에서 보고서 생성 후 **자동 임베딩 생성 및 DB 저장**
+- **임베딩 모델**: `jhgan/ko-sbert-nli` (768차원)
+- **기존 함수 보존**: 새로운 함수 추가로 기존 로직 유지
 
 ### 파이프라인
-1. 더미 보고서 생성 (OpenAI API 또는 더미 텍스트)
+1. 플랫폼 데이터 수집 및 보고서 생성 (실제 LLM 또는 더미)
 2. 한국어 임베딩 모델로 768차원 벡터 생성
 3. PostgreSQL vector 타입으로 DB 저장
 
@@ -20,183 +19,132 @@
 
 ## 🏗️ 아키텍처 변경사항
 
-### 1. DB 스키마 수정
-```sql
--- AS-IS (1536차원)
-report_embedded public.vector(1536)
+### 1. API 위치 수정
+**변경 전**: `/api/generate-summary`에 임베딩 기능 잘못 구현
+**변경 후**: `/reports/weekly`에 올바르게 이동
 
--- TO-BE (768차원)
-report_embedded public.vector(768)
-```
+### 2. 새로 추가된 함수들
 
-**변경 이유:** `jhgan/ko-sbert-nli` 모델이 768차원 출력
-
-### 2. 새로 추가된 코드 구조
-
-#### 📦 새 의존성
+#### 🔧 generate_report_with_fallback()
 ```python
-from sentence_transformers import SentenceTransformer
-import numpy as np
+# OpenAI API 키 상태에 따른 자동 분기
+- API 키 있음: 실제 LLM 보고서 생성 (기존 함수 호출)
+- API 키 없음: 더미 보고서 생성 (개발/테스트용)
 ```
 
-#### 🔧 ReportEmbeddingService 클래스
+#### 💾 store_report_embedding_only()
 ```python
-class ReportEmbeddingService:
-    """보고서 임베딩 전용 서비스"""
-    - create_embedding(): 텍스트 → 768차원 벡터
-    - create_vector_string(): 벡터 → PostgreSQL vector 형식
+# 이미 저장된 보고서에 임베딩만 추가
+- 임베딩 생성 (jhgan/ko-sbert-nli, 768차원)
+- PostgreSQL vector 타입으로 UPDATE
 ```
 
-#### 💾 store_report_with_embedding() 함수
+#### 🔄 insert_report() 수정
 ```python
-async def store_report_with_embedding():
-    """보고서 + 임베딩 통합 저장 함수"""
-    - 임베딩 생성
-    - DB에 보고서와 임베딩 동시 저장
-    - 에러 핸들링 포함
+# 기존: 저장만
+# 수정: 저장 + report_id 반환 (임베딩 저장 시 사용)
 ```
 
-#### 🔄 generate_summary API 수정
-기존 로직 + 임베딩 저장 기능 추가
+### 3. 더미 보고서 존재 이유
+**목적**: OpenAI API 키 없는 개발/테스트 환경 대응
+**⚠️ 중요**: 프로덕션 환경에서는 반드시 제거 필요
+**형식**: 실제 보고서와 동일한 구조로 생성하여 의미있는 임베딩 생성
 
 ---
 
-## 🔑 OpenAI API 키 문제 해결
+## 🔄 새로운 흐름
 
-### 문제 상황
-- 개발 환경에서 OpenAI API 키 없이 테스트 필요
-- 기존 `manager_chain.ainvoke()` 호출 시 401 에러 발생
-
-### 해결 방식
+### `/reports/weekly` API 처리 순서
 ```python
-# OpenAI API 키 검증 로직
-if not OPENAI_API_KEY or OPENAI_API_KEY.startswith("OPENAI_A") or len(OPENAI_API_KEY) < 20:
-    # 더미 보고서 사용
-    manager_summary = "[더미 보고서] Task ... 샘플 텍스트..."
+1. 플랫폼 데이터 수집 (Slack, Notion, Outlook, OneDrive)
+2. task_id별 그룹핑
+3. generate_report_with_fallback() → 보고서 생성
+4. insert_report() → DB 저장 (report_id 반환)
+5. store_report_embedding_only() → 임베딩 저장
+6. return 결과
+```
+
+### API 키 자동 분기
+- **API 키 있음**: 실제 OpenAI LLM 보고서 생성
+- **API 키 없음**: 더미 보고서 생성 (임시, 제거 예정)
+
+---
+
+## 📋 협업자를 위한 체크리스트
+
+### ✅ 완료된 작업
+- [x] 임베딩 기능을 `/reports/weekly`로 이동
+- [x] 기존 함수들 보존하며 새 함수 추가
+- [x] 768차원 임베딩 생성 및 저장
+- [x] API 키 없는 환경에서 더미 보고서 생성
+
+### ⚠️ 프로덕션 배포 시 필수 작업
+- [ ] **OpenAI API 키 설정**
+- [ ] **더미 보고서 로직 제거** (generate_report_with_fallback 함수 내)
+- [ ] 임베딩 기능 정상 작동 확인
+
+### 🔍 테스트 방법
+```bash
+# 1. /reports/weekly API 테스트
+curl -X POST "http://localhost:8001/reports/weekly" \
+  -H "Content-Type: application/json" \
+  -d '{"platform_ids": {"slack": [1,2]}, "start": "2025-09-22", "end": "2025-09-26", "writer": "테스트", "email": "test@skax.co.kr"}'
+
+# 2. 임베딩 저장 확인
+psql -U postgres -h localhost -p 5432 -d weekly_report_db \
+  -c "SELECT id, vector_dims(report_embedded) FROM report ORDER BY id DESC LIMIT 3;"
+```
+
+---
+
+## 🔧 기술적 세부사항
+
+### DB 스키마
+```sql
+-- report 테이블
+report_embedded public.vector(768)  -- 768차원 임베딩 벡터
+```
+
+### 의존성
+```python
+# 새로 추가된 패키지
+sentence-transformers>=2.2.2
+huggingface_hub>=0.16.0
+```
+
+### 함수별 역할
+- `ReportEmbeddingService`: 임베딩 생성 전용 서비스
+- `generate_report_with_fallback()`: API 키 상태별 보고서 생성
+- `store_report_embedding_only()`: 임베딩만 저장하는 함수
+- `insert_report()`: 기존 함수, report_id 반환하도록 수정
+
+---
+
+## 🚨 다음 개발자를 위한 중요 사항
+
+### 1. 프로덕션 배포 전 필수 작업
+```python
+# generate_report_with_fallback() 함수에서 제거해야 할 부분
+if OPENAI_API_KEY and not OPENAI_API_KEY.startswith("OPENAI_A") and len(OPENAI_API_KEY) >= 20:
+    return await generate_report_for_task(task_id, platform_data, start_ts, end_ts, session)
 else:
-    # 실제 OpenAI API 호출
-    manager_summary = await manager_chain.ainvoke({"team_reports": dummy_reports})
+    # 이 부분 전체 제거하고 위의 return만 남기기
+    print(f"🔄 OpenAI API 키가 없어서 더미 보고서를 생성합니다...")
+    # ... 더미 보고서 생성 로직 ...
 ```
 
-**장점:**
-- API 키 없이도 임베딩 기능 테스트 가능
-- 실제 운영 시에는 OpenAI API 정상 작동
-- 개발/테스트 환경 분리
+### 2. 코드 위치 및 역할
+- **임베딩 기능**: `/reports/weekly` API에 구현됨
+- **기존 함수**: 모두 보존, 새 함수만 추가
+- **더미 보고서**: 개발용, 프로덕션에서 제거 필요
 
----
-
-## 🔧 DB 시퀀스 충돌 해결
-
-### 문제 원인
+### 3. 테스트 확인 방법
 ```sql
--- sample_data.sql 기존 설정 (문제)
-SELECT pg_catalog.setval('public.report_id_seq', 1, false);
-```
-- 기존 샘플 데이터: id=1~4
-- 새 INSERT 시도: id=1 (중복 키 에러)
-
-### 해결 방법
-```sql
--- sample_data.sql 수정 (해결)
-SELECT pg_catalog.setval('public.report_id_seq', (SELECT COALESCE(MAX(id), 0) FROM public.report), true);
-```
-- 자동으로 기존 데이터의 최대 ID + 1부터 시작
-- 어떤 샘플 데이터든 호환
-
----
-
-## 🛠️ 설치 및 테스트 가이드
-
-### 1. 환경 설정
-```bash
-# 의존성 설치
-pip install -r requirements.txt
-
-# 주요 추가 패키지
-- sentence-transformers>=2.2.2
-- huggingface_hub>=0.16.0
-```
-
-### 2. DB 초기화
-```bash
-# PostgreSQL 로컬 DB 설정
-psql -U postgres -h localhost -p 5432 -c "DROP DATABASE IF EXISTS weekly_report_db;"
-psql -U postgres -h localhost -p 5432 -c "CREATE DATABASE weekly_report_db;"
-psql -U postgres -h localhost -p 5432 -d weekly_report_db -f sample_data.sql
-```
-
-### 3. API 테스트
-```bash
-# 서버 실행
-python user_timeline_api.py
-
-# Swagger UI 접속
-http://localhost:8001/docs
-
-# /api/generate-summary 테스트
-{
-  "task_id": 1,
-  "start_date": "2025-09-20",
-  "end_date": "2025-09-25"
-}
-```
-
-### 4. 결과 확인
-```sql
--- 임베딩 저장 확인
-psql -U postgres -h localhost -p 5432 -d weekly_report_db -c "SELECT id, task_id, writer, vector_dims(report_embedded) as dimension FROM public.report ORDER BY id DESC LIMIT 3;"
-
--- 상세 확인
-SELECT id, task_id, timestamp, writer,
-       LEFT(report, 100) as report_preview,
-       vector_dims(report_embedded) as embedding_dimension,
-       report_embedded IS NOT NULL as has_embedding
+-- 임베딩이 제대로 저장되었는지 확인
+SELECT id, task_id, vector_dims(report_embedded) as dimension
 FROM public.report
+WHERE report_embedded IS NOT NULL
 ORDER BY id DESC LIMIT 5;
 ```
 
----
-
-## 🎯 협업자를 위한 정보
-
-### 주요 함수별 역할
-- `ReportEmbeddingService.__init__()`: 모델 초기화 (최초 실행 시 다운로드)
-- `create_embedding()`: 텍스트 → 768차원 numpy array → Python list
-- `create_vector_string()`: Python list → PostgreSQL vector 형식 문자열
-- `store_report_with_embedding()`: 전체 파이프라인 통합 실행
-
-### 에러 해결
-1. **ImportError (huggingface_hub)**: `pip install --upgrade huggingface_hub`
-2. **시퀀스 중복 키**: sample_data.sql 재실행 또는 시퀀스 수동 설정
-3. **vector 타입 에러**: `vector_dims()` 함수 사용 (array_length 대신)
-
-### 향후 개선 방향
-- [ ] **실제 프로덕션 환경에서 OpenAI API 키 설정**
-  - ⚠️ **중요:** API 키 설정 후 `user_timeline_api.py` 504-511라인의 더미 텍스트 로직 제거 필요
-  ```python
-  # 제거해야 할 코드 (504-511라인)
-  if not OPENAI_API_KEY or OPENAI_API_KEY.startswith("OPENAI_A") or len(OPENAI_API_KEY) < 20:
-      manager_summary = f"[더미 보고서] Task {request.task_id}에 대한..."
-      print("🔄 OpenAI API 키가 없어서 더미 보고서를 사용합니다.")
-  else:
-      manager_summary = await manager_chain.ainvoke({"team_reports": dummy_reports})
-
-  # 정리 후 코드
-  manager_summary = await manager_chain.ainvoke({"team_reports": dummy_reports})
-  ```
-- [ ] 임베딩 벡터 유사도 검색 API 추가
-- [ ] 배치 처리로 다중 보고서 임베딩 최적화
-- [ ] 임베딩 캐싱 시스템 도입
-
----
-
-## 📋 체크리스트
-
-- [x] 768차원 임베딩 생성 성공
-- [x] PostgreSQL vector 타입 저장 성공
-- [x] API 키 없이 테스트 환경 구축
-- [x] DB 시퀀스 충돌 해결
-- [x] 기존 보고서 생성 로직 보존
-- [x] 에러 핸들링 및 로깅 구현
-
-**✅ 임베딩 기능 구현 완료!**
+**✅ 임베딩 기능 `/reports/weekly`에 올바르게 구현 완료**

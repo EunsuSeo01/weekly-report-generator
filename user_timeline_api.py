@@ -252,20 +252,83 @@ async def get_task_description(task_id: int, session: AsyncSession) -> str:
     row = result.fetchone()
     return row[0] if row else "(설명 없음)"
 
-async def insert_report(task_id: int, writer: str, email: str, content: str, session: AsyncSession):
+async def insert_report(task_id: int, writer: str, email: str, content: str, session: AsyncSession) -> int:
+    """
+    보고서를 DB에 저장하고 생성된 report_id를 반환
+
+    Returns:
+        int: 생성된 report의 id
+    """
     now = datetime.utcnow()
     query = text("""
-        INSERT INTO public.report (task_id, "timestamp", writer, email, content)
+        INSERT INTO public.report (task_id, "timestamp", writer, email, report)
         VALUES (:task_id, :timestamp, :writer, :email, :content)
+        RETURNING id
     """)
-    await session.execute(query, {
+    result = await session.execute(query, {
         "task_id": task_id,
         "timestamp": now,
         "writer": writer,
         "email": email,
         "content": content
     })
+    report_id = result.fetchone()[0]
     await session.commit()
+    return report_id
+
+async def generate_report_with_fallback(task_id: int, platform_data: List[Dict[str, Any]], start_ts: str, end_ts: str, session: AsyncSession) -> str:
+    """
+    API 키 상태에 따라 실제 보고서 또는 더미 보고서를 생성하는 wrapper 함수
+
+    Args:
+        task_id: 작업 ID
+        platform_data: 플랫폼 데이터 리스트
+        start_ts: 시작 날짜
+        end_ts: 종료 날짜
+        session: DB 세션
+
+    Returns:
+        str: 생성된 보고서 내용
+    """
+    # OpenAI API 키가 있고 유효한지 확인
+    if OPENAI_API_KEY and not OPENAI_API_KEY.startswith("OPENAI_A") and len(OPENAI_API_KEY) >= 20:
+        # 실제 OpenAI API를 사용한 보고서 생성
+        return await generate_report_for_task(task_id, platform_data, start_ts, end_ts, session)
+    else:
+        # 더미 보고서 생성 (실제 보고서 형식 유지)
+        print(f"🔄 OpenAI API 키가 없어서 더미 보고서를 생성합니다 - Task {task_id}")
+
+        task_description = await get_task_description(task_id, session)
+        actors = {d.get("actor") for d in platform_data if d.get("actor")}
+        actor_list = "- " + "\n- ".join(actors) if actors else "- (참여자 없음)"
+
+        # 실제 보고서와 동일한 구조로 더미 보고서 생성
+        dummy_report = f"""# 업무 {task_id}: {task_description} 주간 보고서
+
+## 1) 주간 요약
+Task {task_id} ({task_description}) 관련 진행 상황:
+- 프로젝트가 순조롭게 진행되고 있습니다.
+- 주요 기능 개발이 완료되었습니다.
+- 팀원들과의 협업이 효과적으로 이루어지고 있습니다.
+
+## 2) 사람별 주요 산출물
+{actor_list}
+
+## 3) 협업 내역
+팀원들 간의 Slack, Notion, Outlook, OneDrive를 통한 효과적인 협업이 이루어졌습니다.
+주요 의사결정과 진행 상황 공유가 원활히 진행되었습니다.
+
+## 4) 리스크/이슈
+특별한 이슈 없이 계획대로 진행되었습니다.
+향후 발생할 수 있는 리스크에 대한 모니터링을 지속하고 있습니다.
+
+## 5) 차주 계획
+다음 주에는 추가 개선 사항을 반영할 예정입니다.
+팀원들과의 정기 회의를 통해 진행 상황을 점검할 계획입니다.
+
+(기간: {start_ts} ~ {end_ts})"""
+
+        return dummy_report
 
 async def generate_report_for_task(task_id: int, platform_data: List[Dict[str, Any]], start_ts: str, end_ts: str, session: AsyncSession) -> str:
     docs = [Document(page_content=d.get("content", "")) for d in platform_data]
@@ -284,6 +347,59 @@ async def generate_report_for_task(task_id: int, platform_data: List[Dict[str, A
         "end": end_ts,
     })
     return f"# 업무 {task_id}: {task_description} 주간 보고서\n\n{body}"
+
+async def store_report_embedding_only(
+    report_content: str,
+    report_id: int,
+    session: AsyncSession
+) -> Dict[str, Any]:
+    """
+    이미 저장된 보고서에 임베딩만 추가하는 함수
+
+    Args:
+        report_content (str): 보고서 내용
+        report_id (int): 저장된 보고서 ID
+        session (AsyncSession): DB 세션
+
+    Returns:
+        Dict[str, Any]: 임베딩 저장 결과 정보
+    """
+    try:
+        print(f"📊 임베딩 저장 시작 - Report ID {report_id}")
+
+        # 1. 보고서 임베딩 생성
+        embedding_vector = embedding_service.create_embedding(report_content)
+        vector_string = embedding_service.create_vector_string(embedding_vector)
+
+        # 2. 기존 보고서에 임베딩 업데이트
+        query = text("""
+            UPDATE public.report
+            SET report_embedded = CAST(:report_embedded AS vector)
+            WHERE id = :report_id
+        """)
+
+        await session.execute(query, {
+            "report_embedded": vector_string,
+            "report_id": report_id
+        })
+        await session.commit()
+
+        print(f"✅ 임베딩 저장 완료 - Report ID {report_id}, 임베딩 차원: {len(embedding_vector)}")
+
+        return {
+            "success": True,
+            "report_id": report_id,
+            "embedding_dimension": len(embedding_vector),
+            "report_length": len(report_content)
+        }
+
+    except Exception as e:
+        print(f"❌ 임베딩 저장 실패 - Report ID {report_id}: {e}")
+        await session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"임베딩 저장 중 오류 발생: {str(e)}"
+        )
 
 async def store_report_with_embedding(
     task_id: int,
@@ -485,59 +601,38 @@ async def health_check():
 
 # --- 요약 생성 ---
 @app.post("/api/generate-summary", response_model=ReportResponse)
-async def generate_summary(request: ReportRequest, session: AsyncSession = Depends(get_db_session)):
-    """
-    관리자 요약 보고서 생성 API
+async def generate_summary(request: ReportRequest):
+    """기존 관리자 요약API (기존 기능 유지)"""
+    dummy_reports = f"Task {request.task_id} 보고서 (기간 {request.start_date}~{request.end_date})"
+    manager_summary = await manager_chain.ainvoke({"team_reports": dummy_reports})
+    return ReportResponse(summary=manager_summary)
 
-    기존 로직:
-    1. 더미 데이터로 보고서 생성 (manager_chain 사용)
-
-    신규 추가 기능:
-    2. 생성된 보고서를 임베딩하여 DB에 저장
-    """
-    try:
-        print(f"🎯 보고서 생성 시작 - Task {request.task_id}")
-
-        # 1. 기존 로직 유지 - 더미 데이터로 보고서 생성
-        dummy_reports = f"Task {request.task_id} 보고서 (기간 {request.start_date}~{request.end_date})"
-
-        # OpenAI API 키가 없거나 잘못된 경우 더미 텍스트 사용
-        if not OPENAI_API_KEY or OPENAI_API_KEY.startswith("OPENAI_A") or len(OPENAI_API_KEY) < 20:
-            manager_summary = f"[더미 보고서] Task {request.task_id}에 대한 주간 보고서입니다. 기간: {request.start_date}~{request.end_date}. 이는 임베딩 테스트를 위한 샘플 텍스트입니다. 프로젝트 진행 상황이 원활하게 진행되고 있으며, 다음 주에는 추가 개선 사항을 반영할 예정입니다. 팀원들 간의 협업도 효과적으로 이루어지고 있습니다."
-            print("🔄 OpenAI API 키가 없어서 더미 보고서를 사용합니다.")
-        else:
-            manager_summary = await manager_chain.ainvoke({"team_reports": dummy_reports})
-
-        print(f"📄 보고서 생성 완료 - 길이: {len(manager_summary)}자")
-
-        # 2. 🆕 생성된 보고서를 임베딩하여 DB에 저장
-        store_result = await store_report_with_embedding(
-            task_id=request.task_id,
-            report_content=manager_summary,
-            start_date=request.start_date,
-            end_date=request.end_date,
-            writer="manager_summary_system",
-            email="manager@system.com",
-            session=session
-        )
-
-        print(f"💾 저장 결과: {store_result}")
-
-        return ReportResponse(summary=manager_summary)
-
-    except Exception as e:
-        print(f"❌ generate_summary 실행 실패: {e}")
-        # 에러가 발생해도 기존 보고서는 반환 (임베딩 저장은 부가 기능)
-        try:
-            dummy_reports = f"Task {request.task_id} 보고서 (기간 {request.start_date}~{request.end_date})"
-            manager_summary = await manager_chain.ainvoke({"team_reports": dummy_reports})
-            return ReportResponse(summary=manager_summary)
-        except:
-            raise HTTPException(status_code=500, detail=f"보고서 생성 실패: {str(e)}")
-
-# --- 주간 보고서 생성 ---
+# --- 주간 보고서 생성 + 임베딩 저장 ---
 @app.post("/reports/weekly")
 async def make_weekly_report(p: ReportIn, session: AsyncSession = Depends(get_db_session)):
+    """
+    주간 보고서 생성 및 임베딩 저장 API
+
+    흐름:
+    1. 플랫폼별 데이터 수집 (Slack, Notion, Outlook, OneDrive)
+    2. task_id별로 데이터 그룹핑
+    3. 보고서 생성 (generate_report_with_fallback 사용)
+       - OpenAI API 키 있음: 실제 LLM 보고서 생성
+       - OpenAI API 키 없음: 더미 보고서 생성 (임시, 프로덕션에서 제거 필요)
+    4. 보고서 DB 저장 (insert_report)
+    5. 임베딩 생성 및 저장 (store_report_embedding_only)
+       - jhgan/ko-sbert-nli 모델 사용 (768차원)
+       - PostgreSQL vector 타입으로 저장
+
+    Args:
+        p (ReportIn): 플랫폼별 ID 목록, 기간, 작성자 정보
+
+    Returns:
+        dict: 생성된 보고서 목록 및 메타데이터
+
+    Note:
+        - 더미 보고서는 개발/테스트용이며 프로덕션에서는 제거 예정
+    """
     reports = []
 
     # 1. 모든 플랫폼 데이터 수집
@@ -573,8 +668,16 @@ async def make_weekly_report(p: ReportIn, session: AsyncSession = Depends(get_db
     # 3. 보고서 생성
     for task_id, items in grouped.items():
         task_id_int = int(task_id)
-        report_md = await generate_report_for_task(task_id_int, items, p.start, p.end, session)
-        await insert_report(task_id_int, p.writer, p.email, report_md, session)
+
+        # 보고서 생성 (API 키 상태에 따라 자동 분기)
+        report_md = await generate_report_with_fallback(task_id_int, items, p.start, p.end, session)
+
+        # 보고서 저장 (report_id 반환)
+        report_id = await insert_report(task_id_int, p.writer, p.email, report_md, session)
+
+        # 임베딩 생성 및 저장
+        await store_report_embedding_only(report_md, report_id, session)
+
         reports.append({"task_id": task_id_int, "report": report_md})
 
     return {
